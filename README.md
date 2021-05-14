@@ -8,6 +8,8 @@ This python script builds a texture pack from default minecraft textures, changi
 It uses the colorthief library to get a color palette from textures, with sklearn to cluster them into similar colors, and applying them to the
 different layers making up the among us character.
 
+**The texture pack generated from 1.16.5 is included in the release if you're not interested in the script part of the project.**
+
 ## Usage
 
 ### Windows (executable)
