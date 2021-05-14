@@ -1,0 +1,1 @@
+pyinstaller susmc.spec -y --distpath="."

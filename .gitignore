@@ -1,0 +1,10 @@
+# Pycharm files
+.idea/
+
+# Built resourcepacks
+assets/
+*.zip
+
+# pyinstaller
+build/
+*.exe
