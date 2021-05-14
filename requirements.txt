@@ -3,7 +3,6 @@ colorthief~=0.2.1
 Pillow~=8.2.0
 progress~=1.5
 scikit-learn~=0.24.2
-sklearn~=0.0
 
 # Build
 pyinstaller~=4.3

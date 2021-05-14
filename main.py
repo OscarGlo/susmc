@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sys
+import traceback
 import zipfile
 
 import click
@@ -10,6 +11,7 @@ from PIL import Image
 from colorthief import ColorThief
 from progress.bar import IncrementalBar
 from progress.spinner import Spinner
+from typing import Tuple
 
 try:
     from sklearn.cluster import KMeans
@@ -18,7 +20,7 @@ except KeyboardInterrupt:
     exit(1)
 
 
-def color_filter(img: Image, color: tuple[int, int, int]):
+def color_filter(img: Image, color: Tuple[int, int, int]):
     pixels = img.load()
 
     # Changes all non fully transparent pixels to the given color
@@ -45,17 +47,22 @@ def get_palette(path):
     return palette
 
 
-def transform(source, dest):
+def transform(source, dest, overlay=False):
     palette = get_palette(source)
 
     res = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
 
     # Base bundle path
-    base_path = __file__[:__file__.rindex(os.sep)]
+    if os.sep in __file__:
+        base_path = __file__[:__file__.rindex(os.sep)]
+    else:
+        base_path = "."
 
     # Color and stack all layers according to palette
-    for i in range(5):
-        layer = Image.open(os.path.join(base_path, f"layers/{i}.png"))
+    for i in range(5 if not overlay else 2):
+        # Only two last layers for overlay files
+        li = i if not overlay else i + 3
+        layer = Image.open(os.path.join(base_path, f"layers/{li}.png"))
         pi = min(i, len(palette) - 1)
         color_filter(layer, palette[pi])
         res = Image.alpha_composite(res, layer)
@@ -63,24 +70,25 @@ def transform(source, dest):
     res.save(dest)
 
 
-def amogus(source_folder, dest_folder, debug=True):
+def amogus(source_folder, dest_folder, progress=True, debug=False):
     os.makedirs(dest_folder, exist_ok=True)
 
     files = glob.glob(os.path.join(source_folder, "*.png"))
 
     bar = None
-    if debug:
+    if progress:
         bar = IncrementalBar("Processing images...", max=len(files), suffix='%(index)d/%(max)d files')
 
     for file in files:
         name = file.split(os.path.sep)[-1]
         # Skip overlay files for more colorful amogus
-        if not name.endswith("_overlay.png"):
-            out = os.path.join(dest_folder, name)
-            try:
-                transform(file, out)
-            except Exception as e:
-                print(f"\nError on {name}: {e}")
+        out = os.path.join(dest_folder, name)
+        try:
+            transform(file, out, name.endswith("_overlay.png"))
+        except Exception as e:
+            print(f"\nError on {name}: {e}")
+            if debug:
+                traceback.print_exc()
         if bar:
             bar.next()
     if bar:
@@ -88,7 +96,6 @@ def amogus(source_folder, dest_folder, debug=True):
 
 
 def sus(lang_path):
-    data = None
     # Read
     with open(lang_path) as f:
         data = json.load(f)
@@ -102,36 +109,42 @@ def sus(lang_path):
         json.dump(data, f)
 
 
+def unzip_files(path, folders=[], files=[]):
+    contents = zipfile.ZipFile(path)
+
+    # Unzip files from jar
+    spin = Spinner("Unzipping files...")
+    for f in contents.namelist():
+        spin.next()
+        for dir in folders:
+            if f.startswith(dir):
+                contents.extract(f)
+    for f in files:
+        contents.extract(f)
+    spin.finish()
+
+
 @click.command()
 @click.option("-f", "--format", "pack_format", default=6, type=click.INT, help="Format id for the pack (6 by default)")
+@click.option("-D", "--debug", "debug", is_flag=True, help="Show detailed error information")
 @click.argument("jar_path", type=click.Path(exists=True))
 @click.argument("dest_folder", default=".", type=click.Path())
-def make_ressourcepack(jar_path, dest_folder, pack_format):
+def make_ressourcepack(jar_path, dest_folder, pack_format, debug):
     """
     Creates an amogusified resourcepack from the jar at JAR_PATH,
     and writes it in DEST_FOLDER or the current directory if not specified.
     If DEST_FOLDER does not exist, it will be created.
     """
     name = jar_path.split(os.sep)[-1][:-4]
-    contents = zipfile.ZipFile(jar_path)
-
-    # Unzip files from jar
-    spin = Spinner("Unzipping files...")
     item = "assets/minecraft/textures/item"
     lang = "assets/minecraft/lang"
-    for f in contents.namelist():
-        spin.next()
-        if f.startswith(item):
-            contents.extract(f)
-        elif f.startswith(lang):
-            contents.extract(f)
-    spin.finish()
+    unzip_files(jar_path, folders=[item, lang])
 
     # Sussify lang files
-    for file in glob.glob(f"{lang}/*.json"):
+    for file in glob.glob(f"assets/minecraft/lang/*.json"):
         sus(file)
     # Amogus item textures
-    amogus(item, item)
+    amogus(item, item, debug=debug)
 
     # Write pack mcmeta
     with open("pack.mcmeta", "w") as f:
