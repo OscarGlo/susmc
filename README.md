@@ -23,7 +23,7 @@ Alternatively, you can use the executable as a command line tool by replacing `p
 
 Clone the repository on your machine: `git clone https://github.com/OscarGlo/susmc`
 
-Install required dependencies (could take up to a few minutes): `python pip install requirements.txt`
+Install required dependencies (could take up to a few minutes): `python pip install -r requirements.txt`
 
 Then, to create a resource pack, run `python main.py [jar_path] [destination_folder]`
 
